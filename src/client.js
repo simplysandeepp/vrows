@@ -39,10 +39,26 @@ if(of){window.fetch=function(i,o){
     if(typeof i==='string'||i instanceof URL) i=px(i);
     else if(i&&i.url) i=new Request(px(i.url),i);
   }catch(e){}
-  return of.call(this,i,o);
+  var pr=of.call(this,i,o);
+  pr.then(function(res){
+    try{
+      if(/json/i.test(res.headers.get('content-type')||'')&&!(+res.headers.get('content-length')>300000)) res.clone().text().then(scanText);
+    }catch(e){}
+  }).catch(function(){});
+  return pr;
 };}
 var xo=XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open=function(m,u){arguments[1]=px(u);return xo.apply(this,arguments)};
+var xs=XMLHttpRequest.prototype.send;
+XMLHttpRequest.prototype.send=function(){
+  var x=this;
+  this.addEventListener('load',function(){
+    try{
+      if(/json/i.test(x.getResponseHeader('content-type')||'')&&(x.responseType===''||x.responseType==='text')&&x.responseText.length<400000) scanText(x.responseText);
+    }catch(e){}
+  });
+  return xs.apply(this,arguments);
+};
 if(navigator.sendBeacon){var sb=navigator.sendBeacon;navigator.sendBeacon=function(u,d){return sb.call(navigator,px(u),d)}}
 if(window.EventSource){var ES=window.EventSource;window.EventSource=function(u,o){return new ES(px(u),o)};window.EventSource.prototype=ES.prototype}
 if(window.Worker){var WK=window.Worker;window.Worker=function(u,o){return new WK(px(u),o)};window.Worker.prototype=WK.prototype}
@@ -72,7 +88,8 @@ function navOk(u){
     if(site(t.hostname)!==site(hostOf(B))) return false;
     if(Date.now()-lastInput<5000) return true;
     if(navigator.userActivation&&navigator.userActivation.isActive) return true;
-    if(t.pathname===new URL(B).pathname) return false;
+    // some sites bounce once to the same page with a token (a "checking your browser" step);
+    // a couple of such moves are fine, endless ones are not
     return autoMoves()<=2;
   }catch(e){return true}
 }
@@ -211,22 +228,86 @@ try{
   Object.defineProperty(SP,'length',{configurable:true,get:function(){return names(this).length}});
 }catch(e){}
 
-// Direct media files (not streams assembled in the page) that the shell can offer for download
-var MEDIA=/\.(mp4|m4v|webm|mov|mkv|ogv|mp3|m4a|aac|ogg|oga|wav|flac|m3u8|mpd)$/i,IMG=/\.(jpe?g|png|gif|webp|avif|svg|ico|bmp)$/i,seen={},found=[];
-function addMedia(u,hint){
+// Media the page is playing, so the shell can offer to save it. Candidates come from the page's
+// media elements, its network requests and URLs inside JSON answers (players usually fetch their
+// file list from an API). Each one is checked through the proxy before it is offered, so only
+// real video/audio files and HLS playlists are listed.
+var MEDIA=/\\.(mp4|m4v|webm|mov|mkv|ogv|mp3|m4a|aac|ogg|oga|wav|flac|m3u8)$/i,IMG=/\\.(jpe?g|png|gif|webp|avif|svg|ico|bmp)$/i,seen={},found=[],queue=[],active=0;
+function postMedia(){try{parent.postMessage({vp:3,media:found},'*')}catch(e){}}
+function mediaKind(ct,ext){
+  ct=(ct||'').toLowerCase();
+  if(ct.indexOf('mpegurl')>=0) return 'hls';
+  if(ext==='m3u8'&&(ct.indexOf('text/')===0||ct.indexOf('application/octet')===0)) return 'hls';
+  if(ct.indexOf('video/')===0) return 'video';
+  if(ct.indexOf('audio/')===0) return 'audio';
+  if(ct.indexOf('octet-stream')>=0||ct.indexOf('binary')>=0){
+    if(/^(mp4|m4v|webm|mov|mkv|ogv)$/.test(ext)) return 'video';
+    if(/^(mp3|m4a|aac|ogg|oga|wav|flac)$/.test(ext)) return 'audio';
+  }
+  return null;
+}
+function addMedia(u,hint,label){
   if(!u||/^(blob|data):/i.test(u)) return;
-  var real;
   try{
     var a=new URL(u,location.href);
-    real=a.origin===location.origin?realOf(a.pathname+a.search):a.href;
-    var path=new URL(real).pathname;
-    if(IMG.test(path)||(!hint&&!MEDIA.test(path))) return;
-    if(seen[real]) return;
+    a.hash='';
+    var real=a.origin===location.origin?realOf(a.pathname+a.search):a.href;
+    // our own checks and the app's downloads carry a helper parameter; it is not part of the file's address
+    real=real.replace(/([?&])__vrp=[^&]*(&?)/,function(all,lead,trail){return trail?lead:''});
+    if(real.slice(-1)==='?') real=real.slice(0,-1);
+    var path=new URL(real).pathname,m=path.match(MEDIA);
+    if(IMG.test(path)||(!hint&&!m)||seen[real]) return;
     seen[real]=1;
-    var ext=(path.match(MEDIA)||[])[1];
-    found.push({url:real,kind:/^(m3u8|mpd)$/i.test(ext||'')?'stream':(hint||(/^(mp3|m4a|aac|ogg|oga|wav|flac)$/i.test(ext||'')?'audio':'video'))});
-    try{parent.postMessage({vp:3,media:found},'*')}catch(e){}
+    queue.push({url:real,ext:m?m[1].toLowerCase():'',label:label||''});
+    pump();
   }catch(e){}
+}
+function pump(){while(active<3&&queue.length){active++;check(queue.shift())}}
+function peek(res){
+  if(!res.body||!res.body.getReader) return res.text().then(function(t){return t.slice(0,2048)});
+  var r=res.body.getReader();
+  return r.read().then(function(x){
+    try{r.cancel()}catch(e){}
+    return x.value?new TextDecoder().decode(x.value.slice(0,2048)):'';
+  });
+}
+function check(c){
+  var u=px(c.url);
+  u+=(u.indexOf('?')<0?'?':'&')+'__vrp='+encodeURIComponent(B);
+  of.call(window,u,{headers:{Range:'bytes=0-2047'}}).then(function(res){
+    if(!res.ok&&res.status!==206) return;
+    var ct=res.headers.get('content-type')||'';
+    if(/json/i.test(ct)) return res.text().then(scanText);
+    var cr=res.headers.get('content-range'),total=cr&&/\\/(\\d+)$/.test(cr)?+RegExp.$1:(+res.headers.get('content-length')||0);
+    var kind=mediaKind(ct,c.ext);
+    return peek(res).then(function(txt){
+      if(!kind&&/^\\s*#EXTM3U/.test(txt)) kind='hls';
+      if(!kind) return;
+      found.push({url:c.url,kind:kind,label:c.label,size:kind==='hls'?0:total,master:kind==='hls'&&txt.indexOf('#EXT-X-STREAM-INF')>=0});
+      postMedia();
+    });
+  }).catch(function(){}).then(function(){active--;pump()});
+}
+function walk(o,hits,depth){
+  if(!o||typeof o!=='object'||depth>8) return;
+  for(var k in o){
+    var v=o[k];
+    if(typeof v==='string'){
+      if(v.indexOf('http')===0){
+        try{var p=new URL(v).pathname;if(MEDIA.test(p)&&!IMG.test(p)) hits.push({url:v,label:String(o.quality||o.label||o.height||o.resolution||o.format||'')})}catch(e){}
+      }
+    }else walk(v,hits,depth+1);
+  }
+}
+var BS=String.fromCharCode(92);
+function scanText(t){
+  if(!t||t.length>400000||!/(mp4|m4v|webm|mov|m3u8)/i.test(t)) return;
+  var hits=[];
+  try{walk(JSON.parse(t),hits,0)}catch(e){
+    var tt=t.split(BS+'/').join('/').split(BS+'u0026').join('&');
+    (tt.match(/https?:\\/\\/[^\\s"'<>]+?\\.(?:mp4|m4v|webm|mov|m3u8)(?:\\?[^\\s"'<>]*)?/gi)||[]).forEach(function(x){hits.push({url:x,label:''})});
+  }
+  hits.slice(0,16).forEach(function(h){addMedia(h.url,null,h.label)});
 }
 function scanMedia(){
   try{

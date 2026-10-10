@@ -138,6 +138,11 @@
   #dllist .acts { display: flex; gap: 8px; }
   #dllist a, #dllist button { height: auto; padding: 9px 14px; font-size: 14px; border-radius: 10px; text-decoration: none; border: 1px solid var(--line); color: var(--text); background: var(--glass); }
   #dllist a.primary { background: linear-gradient(135deg, var(--accent), #5d8bff); border-color: transparent; color: #fff; }
+  progress { width: 100%; height: 10px; border-radius: 6px; overflow: hidden; accent-color: var(--accent); margin: 4px 0 8px; }
+  #hlsq { display: grid; gap: 8px; margin-bottom: 12px; max-height: 46vh; overflow: auto; }
+  #hlsq .btn { text-align: left; display: flex; justify-content: space-between; gap: 12px; }
+  #hlsq .btn small { color: var(--muted); }
+  #hlsmsg { min-height: 20px; }
   #err { color: var(--danger); font-size: 14px; min-height: 20px; margin: 0 0 8px; }
   #toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 84px); transform: translate(-50%, 20px); max-width: 90vw; padding: 10px 16px; background: rgba(240,242,255,.95); color: #0b0d1a; border-radius: 14px; font-size: 14px; opacity: 0; pointer-events: none; transition: .25s; z-index: 40; }
   #toast.on { opacity: 1; transform: translate(-50%, 0); }
@@ -228,6 +233,14 @@
   <p>Plain video and audio files found on the page.</p>
   <ul class="list" id="dllist"></ul>
   <button class="btn" id="dlclose" type="button" style="width:100%">Close</button>
+</dialog>
+
+<dialog id="hlsdlg">
+  <h2 id="hlstitle">Download video</h2>
+  <p id="hlsmsg"></p>
+  <div id="hlsq"></div>
+  <progress id="hlsbar" max="100" value="0" hidden></progress>
+  <button class="btn" id="hlscancel" type="button" style="width:100%">Cancel</button>
 </dialog>
 
 <dialog id="histdlg">
@@ -609,7 +622,10 @@ window.addEventListener('blur', () => { pop.hidden = true; }); // a tap inside t
 /* ---------- Plain media files found on the page ---------- */
 let media = [];
 function setMedia(list) {
-  media = Array.isArray(list) ? list.filter((m) => m && typeof m.url === 'string') : [];
+  let items = Array.isArray(list) ? list.filter((m) => m && typeof m.url === 'string') : [];
+  // when a page offers a master playlist, its individual quality playlists are not shown separately
+  if (items.some((m) => m.kind === 'hls' && m.master)) items = items.filter((m) => m.kind !== 'hls' || m.master);
+  media = items;
   $('m-dl').hidden = media.length === 0;
   $('dlcount').textContent = media.length || '';
 }
@@ -620,6 +636,11 @@ function fileName(u, kind) {
   } catch {}
   return kind === 'audio' ? 'audio' : 'video';
 }
+const fmtSize = (n) => (n > 1e9 ? (n / 1e9).toFixed(2) + ' GB' : n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : n > 1e3 ? Math.round(n / 1e3) + ' KB' : '');
+const safeName = (s, fallback) => (s || fallback).replace(/[^\p{L}\p{N}\-_ ]+/gu, '').trim().slice(0, 60) || fallback;
+// Proxied address that also tells the server which page it came from (many CDNs check the referer)
+const withPage = (u) => { const p = proxyUrl(u); return p + (p.includes('?') ? '&' : '?') + '__vrp=' + encodeURIComponent(curUrl || u); };
+
 function showMedia() {
   const ul = $('dllist');
   ul.replaceChildren();
@@ -627,17 +648,26 @@ function showMedia() {
     const li = document.createElement('li');
     const name = document.createElement('div');
     name.className = 'name';
-    name.textContent = fileName(m.url, m.kind);
+    name.textContent = (m.label ? m.label + (/^\d+$/.test(m.label) ? 'p · ' : ' · ') : '') + fileName(m.url, m.kind);
     const meta = document.createElement('div');
     meta.className = 'meta';
-    meta.textContent = m.kind === 'stream' ? 'Streaming playlist: not a single file' : m.kind === 'audio' ? 'Audio file' : 'Video file';
+    const size = m.size ? ' · ' + fmtSize(m.size) : '';
+    meta.textContent = m.kind === 'hls' ? 'Streaming video (saved as an MP4)' : (m.kind === 'audio' ? 'Audio file' : 'Video file') + size;
     const acts = document.createElement('div');
     acts.className = 'acts';
-    if (m.kind !== 'stream') {
+    if (m.kind === 'hls') {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'primary';
+      b.textContent = 'Download';
+      b.onclick = () => { $('dldlg').close(); startHls(m.url); };
+      b.style.cssText = 'background:linear-gradient(135deg,var(--accent),#5d8bff);border-color:transparent;color:#fff';
+      acts.append(b);
+    } else {
       const a = document.createElement('a');
       a.className = 'primary';
       a.textContent = 'Download';
-      a.href = proxyUrl(m.url);
+      a.href = withPage(m.url);
       a.download = fileName(m.url, m.kind);
       acts.append(a);
     }
@@ -651,6 +681,210 @@ function showMedia() {
   }
   $('dldlg').showModal();
 }
+
+/* ---------- Streaming (HLS) download: fetch the pieces and join them in the browser ---------- */
+let hlsCtrl = null;
+const attrs = (s) => { const o = {}; s.replace(/([A-Z0-9-]+)=("[^"]*"|[^,]*)/g, (m, k, v) => { o[k] = v.replace(/^"|"$/g, ''); }); return o; };
+async function getRes(u, signal, range, tries = 3) {
+  let err;
+  const opts = { signal };
+  if (range) opts.headers = { Range: `bytes=${range.start}-${range.end}` };
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(withPage(u), opts);
+      if (r.ok) return r;
+      err = new Error('HTTP ' + r.status);
+    } catch (e) { if (e.name === 'AbortError') throw e; err = e; }
+    await new Promise((res) => setTimeout(res, 400 * (i + 1)));
+  }
+  throw err;
+}
+const getText = async (u, signal) => (await getRes(u, signal)).text();
+const getBytes = async (u, signal, range) => new Uint8Array(await (await getRes(u, signal, range)).arrayBuffer());
+
+function parseMaster(text, base) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith('#EXT-X-STREAM-INF:')) continue;
+    const a = attrs(lines[i].slice(18));
+    let j = i + 1;
+    while (j < lines.length && (!lines[j] || lines[j].startsWith('#'))) j++;
+    if (lines[j]) out.push({ url: new URL(lines[j], base).href, bw: +a.BANDWIDTH || 0, res: a.RESOLUTION || '' });
+  }
+  return out.sort((x, y) => y.bw - x.bw);
+}
+
+const parseRange = (s, prevEnd) => {
+  const [len, off] = String(s).replace(/"/g, '').split('@');
+  const start = off === undefined ? prevEnd || 0 : +off;
+  return { start, end: start + +len - 1 };
+};
+
+function parsePlaylist(text, base) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  let seq = 0, key = null, map = null;
+  const segs = [];
+  const ends = {}; // where the previous byte range of each file stopped
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.startsWith('#EXT-X-MEDIA-SEQUENCE:')) seq = parseInt(l.split(':')[1], 10) || 0;
+    else if (l.startsWith('#EXT-X-KEY:')) {
+      const a = attrs(l.slice(11));
+      if (a.METHOD === 'NONE') key = null;
+      else if (a.METHOD === 'AES-128') key = { uri: new URL(a.URI, base).href, iv: a.IV || null };
+      else throw new Error('This video is protected and cannot be saved.');
+    } else if (l.startsWith('#EXT-X-MAP:')) {
+      const a = attrs(l.slice(11));
+      const url = new URL(a.URI, base).href;
+      map = { url, range: a.BYTERANGE ? parseRange(a.BYTERANGE, ends[url]) : null };
+      if (map.range) ends[url] = map.range.end + 1;
+    } else if (l.startsWith('#EXTINF:')) {
+      let j = i + 1, br = null;
+      while (j < lines.length && (!lines[j] || lines[j].startsWith('#'))) {
+        if (lines[j].startsWith('#EXT-X-BYTERANGE:')) br = lines[j].slice(17);
+        j++;
+      }
+      if (lines[j]) {
+        const url = new URL(lines[j], base).href;
+        const range = br ? parseRange(br, ends[url]) : null;
+        if (range) ends[url] = range.end + 1;
+        segs.push({ url, range, key, seq: seq + segs.length });
+      }
+      i = j;
+    }
+  }
+  return { segs, map };
+}
+
+async function decryptSegment(bytes, seg, keys, signal) {
+  if (!seg.key) return bytes;
+  let ck = keys.get(seg.key.uri);
+  if (!ck) {
+    ck = await crypto.subtle.importKey('raw', await getBytes(seg.key.uri, signal), 'AES-CBC', false, ['decrypt']);
+    keys.set(seg.key.uri, ck);
+  }
+  const iv = new Uint8Array(16);
+  if (seg.key.iv) {
+    const hex = seg.key.iv.replace(/^0x/i, '').padStart(32, '0');
+    for (let i = 0; i < 16; i++) iv[i] = parseInt(hex.substr(i * 2, 2), 16);
+  } else new DataView(iv.buffer).setUint32(12, seg.seq);
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, ck, bytes));
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('script'));
+    document.head.append(s);
+  });
+}
+// MPEG-TS pieces play in few apps; re-wrapping them as MP4 plays almost everywhere
+async function tsToMp4(parts) {
+  if (!window.muxjs) await loadScript('https://cdn.jsdelivr.net/npm/mux.js@6.3.0/dist/mux.min.js');
+  return new Promise((resolve, reject) => {
+    const tm = new window.muxjs.mp4.Transmuxer({ keepOriginalTimestamps: true });
+    const chunks = [];
+    let init = false;
+    const t = setTimeout(() => reject(new Error('timeout')), 60000);
+    tm.on('data', (s) => { if (!init) { chunks.push(s.initSegment); init = true; } chunks.push(s.data); });
+    tm.on('done', () => { clearTimeout(t); chunks.length > 1 ? resolve(new Blob(chunks, { type: 'video/mp4' })) : reject(new Error('empty')); });
+    try { for (const p of parts) tm.push(p); tm.flush(); } catch (e) { clearTimeout(t); reject(e); }
+  });
+}
+
+function saveBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 60000);
+}
+
+function hlsUi({ title, msg, progress, choices }) {
+  if (title !== undefined) $('hlstitle').textContent = title;
+  if (msg !== undefined) $('hlsmsg').textContent = msg;
+  $('hlsbar').hidden = progress === undefined;
+  if (progress !== undefined) $('hlsbar').value = progress;
+  const q = $('hlsq');
+  q.replaceChildren();
+  for (const c of choices || []) q.append(c);
+  $('hlscancel').textContent = choices ? 'Cancel' : 'Stop';
+}
+
+async function startHls(url) {
+  hlsCtrl = new AbortController();
+  const signal = hlsCtrl.signal;
+  $('hlsdlg').showModal();
+  hlsUi({ title: 'Preparing…', msg: 'Reading the video list', progress: undefined });
+  try {
+    const text = await getText(url, signal);
+    if (!/^\s*#EXTM3U/.test(text)) throw new Error('This is not a video stream.');
+    const variants = parseMaster(text, url);
+    if (variants.length > 1) {
+      const buttons = variants.map((v) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn';
+        const left = document.createElement('span');
+        left.textContent = v.res ? v.res.split('x')[1] + 'p' : 'Video';
+        const right = document.createElement('small');
+        right.textContent = v.bw ? (v.bw / 1e6).toFixed(1) + ' Mbps' : '';
+        b.append(left, right);
+        b.onclick = () => downloadHls(v.url, null);
+        return b;
+      });
+      hlsUi({ title: 'Choose quality', msg: 'Higher quality means a bigger file.', choices: buttons });
+    } else {
+      await downloadHls(variants[0] ? variants[0].url : url, text);
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') hlsUi({ title: 'Could not download', msg: e.message || 'Something went wrong.', choices: [] });
+  }
+}
+
+async function downloadHls(playlistUrl, knownText) {
+  const signal = hlsCtrl.signal;
+  try {
+    hlsUi({ title: 'Downloading…', msg: 'Starting', progress: 0 });
+    const text = knownText && !/#EXT-X-STREAM-INF/.test(knownText) ? knownText : await getText(playlistUrl, signal);
+    const { segs, map } = parsePlaylist(text, playlistUrl);
+    if (!segs.length) throw new Error('No video found in this stream.');
+    const parts = new Array(segs.length);
+    const keys = new Map();
+    const mapBytes = map ? await getBytes(map.url, signal, map.range) : null;
+    let next = 0, done = 0, total = 0;
+    const lane = async () => {
+      while (next < segs.length) {
+        const i = next++;
+        let b = await getBytes(segs[i].url, signal, segs[i].range);
+        b = await decryptSegment(b, segs[i], keys, signal);
+        parts[i] = b;
+        total += b.length;
+        done++;
+        hlsUi({ title: 'Downloading…', msg: `${done} of ${segs.length} parts · ${fmtSize(total)}`, progress: (done / segs.length) * 100 });
+      }
+    };
+    await Promise.all(Array.from({ length: 4 }, lane));
+
+    hlsUi({ title: 'Finishing…', msg: 'Preparing the file', progress: 100 });
+    let blob, ext = 'mp4';
+    if (mapBytes) blob = new Blob([mapBytes, ...parts], { type: 'video/mp4' });
+    else {
+      try { blob = await tsToMp4(parts); } catch { blob = null; }
+      if (!blob) { blob = new Blob(parts, { type: 'video/mp2t' }); ext = 'ts'; }
+    }
+    saveBlob(blob, safeName(curTitle, 'video') + '.' + ext);
+    hlsUi({ title: 'Saved', msg: ext === 'ts' ? 'Saved as a .ts file (play it with VLC).' : 'Your video was saved.', choices: [] });
+    $('hlscancel').textContent = 'Close';
+  } catch (e) {
+    if (e.name !== 'AbortError') hlsUi({ title: 'Could not download', msg: e.message || 'Something went wrong.', choices: [] });
+  }
+}
+$('hlscancel').onclick = () => { if (hlsCtrl) hlsCtrl.abort(); $('hlsdlg').close(); };
+$('hlsdlg').addEventListener('close', () => { if (hlsCtrl) hlsCtrl.abort(); });
+
 $('m-dl').onclick = showMedia;
 $('dlclose').onclick = () => $('dldlg').close();
 

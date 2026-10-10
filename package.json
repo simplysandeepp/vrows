@@ -7,8 +7,9 @@
   "license": "MIT",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "icons": "node scripts/make-icons.mjs"
+    "deploy": "node scripts/check.mjs && wrangler deploy",
+    "icons": "node scripts/make-icons.mjs",
+    "check": "node scripts/check.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.149.0"

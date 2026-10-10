@@ -96,13 +96,33 @@ function fromReferer(request, url) {
   return new Response(null, { status: 307, headers: { location: proxyUrl(real.href) } });
 }
 
+// Pulls a helper parameter out of a raw query string without re-encoding the rest
+// (signed URLs break if their query is re-serialised)
+function takeParam(search, name) {
+  const re = new RegExp('([?&])' + name + '=([^&]*)(&?)');
+  const m = search.match(re);
+  if (!m) return { search, value: null };
+  const rest = search.replace(re, (all, lead, v, trail) => (trail ? lead : ''));
+  let value = null;
+  try { value = decodeURIComponent(m[2]); } catch { /* ignore */ }
+  return { search: rest === '?' ? '' : rest, value };
+}
+
 async function proxy(request, url, env) {
   let target = realFromProxyPath(url.pathname + url.search);
   if (!target) return text('Bad address', 400);
+  // downloads started from the app carry the page they came from (many CDNs check the referer)
+  const taken = takeParam(target.search, '__vrp');
+  let hintedPage = null;
+  if (taken.value !== null) {
+    target.search = taken.search;
+    try { hintedPage = new URL(taken.value); hintedPage.hash = ''; } catch { hintedPage = null; }
+    if (hintedPage && hintedPage.protocol !== 'http:' && hintedPage.protocol !== 'https:') hintedPage = null;
+  }
   if (target.protocol !== 'http:' && target.protocol !== 'https:') return text('Only http/https', 400);
 
   // A page built a URL on our own origin: it means "this path on the site I'm proxying"
-  const page = pageFromReferer(request, url);
+  const page = hintedPage || pageFromReferer(request, url);
   if (target.host === url.host && page) target = new URL(target.pathname + target.search, page);
   if (target.host === url.host || isBlockedHost(target.hostname)) return text('Blocked target', 403);
   if (env.ADBLOCK !== 'off' && isAdRequest(target)) return blockedResponse(request);
@@ -173,6 +193,7 @@ async function proxy(request, url, env) {
     if (v) out.set(name, v);
   }
   for (const c of setCookies) out.append('set-cookie', c);
+  out.set('x-vrows-final', target.href); // where redirects ended up (helps explain odd results)
   const type = (res.headers.get('content-type') || '').toLowerCase();
 
   if (type.includes('text/html')) {
