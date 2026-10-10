@@ -211,6 +211,43 @@ try{
   Object.defineProperty(SP,'length',{configurable:true,get:function(){return names(this).length}});
 }catch(e){}
 
+// Direct media files (not streams assembled in the page) that the shell can offer for download
+var MEDIA=/\.(mp4|m4v|webm|mov|mkv|ogv|mp3|m4a|aac|ogg|oga|wav|flac|m3u8|mpd)$/i,IMG=/\.(jpe?g|png|gif|webp|avif|svg|ico|bmp)$/i,seen={},found=[];
+function addMedia(u,hint){
+  if(!u||/^(blob|data):/i.test(u)) return;
+  var real;
+  try{
+    var a=new URL(u,location.href);
+    real=a.origin===location.origin?realOf(a.pathname+a.search):a.href;
+    var path=new URL(real).pathname;
+    if(IMG.test(path)||(!hint&&!MEDIA.test(path))) return;
+    if(seen[real]) return;
+    seen[real]=1;
+    var ext=(path.match(MEDIA)||[])[1];
+    found.push({url:real,kind:/^(m3u8|mpd)$/i.test(ext||'')?'stream':(hint||(/^(mp3|m4a|aac|ogg|oga|wav|flac)$/i.test(ext||'')?'audio':'video'))});
+    try{parent.postMessage({vp:3,media:found},'*')}catch(e){}
+  }catch(e){}
+}
+function scanMedia(){
+  try{
+    document.querySelectorAll('video,audio').forEach(function(m){
+      var h=m.tagName==='AUDIO'?'audio':'video';
+      addMedia(m.currentSrc,h); addMedia(m.getAttribute('src'),h);
+      m.querySelectorAll('source').forEach(function(x){addMedia(x.getAttribute('src'),h)});
+    });
+    performance.getEntriesByType('resource').forEach(function(e){
+      addMedia(e.name,e.initiatorType==='video'||e.initiatorType==='audio'?e.initiatorType:null);
+    });
+  }catch(e){}
+}
+setInterval(scanMedia,2000);
+// media found in nested frames (embedded players) is passed up to the shell
+window.addEventListener('message',function(e){
+  if(e.data&&e.data.vp===3&&e.source!==parent&&window.top!==window){
+    try{parent.postMessage(e.data,'*')}catch(x){}
+  }
+});
+
 document.addEventListener('DOMContentLoaded',notify);
 window.addEventListener('load',notify);
 notify();

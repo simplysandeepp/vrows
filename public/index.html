@@ -67,6 +67,37 @@
   dialog p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
   dialog input { width: 100%; height: 44px; padding: 0 12px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
   dialog .save { width: 100%; margin-top: 12px; height: 44px; font-size: 16px; background: var(--accent); color: var(--accent-text); }
+  #menu { position: relative; }
+  #dlcount { position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+    background: var(--accent); color: var(--accent-text); font-size: 11px; line-height: 16px; font-weight: 700; }
+  #dlcount:empty { display: none; }
+  #menu-pop { position: fixed; top: calc(env(safe-area-inset-top) + 54px); right: 10px; z-index: 6; min-width: 190px; padding: 6px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+  #menu-pop[hidden] { display: none; }
+  #menu-pop button { display: block; width: 100%; height: auto; padding: 11px 12px; text-align: left; font-size: 15px; border-radius: 9px; }
+  #histq { margin-bottom: 10px; }
+  #histlist { list-style: none; margin: 0 0 12px; padding: 0; max-height: 52vh; overflow: auto; }
+  #histlist .day { margin: 10px 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  #histlist li.row { display: flex; align-items: center; gap: 4px; border-radius: 10px; }
+  #histlist li.row:hover { background: var(--bg); }
+  #histlist .open { flex: 1; min-width: 0; width: auto; height: auto; padding: 8px 8px; text-align: left; font-size: 14px; border-radius: 10px; }
+  #histlist .t { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #histlist .s { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+  #histlist .del { flex: none; width: 34px; height: 34px; font-size: 14px; color: var(--muted); }
+  .empty { color: var(--muted); text-align: center; margin: 24px 0; font-size: 14px; }
+  .histbar { display: flex; gap: 8px; }
+  .histbar button { flex: 1; width: auto; height: 44px; font-size: 15px; border: 1px solid var(--line); border-radius: 10px; }
+  .offrow { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+  .offrow input { width: 18px; height: 18px; }
+  #dllist { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
+  #dllist li { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  #dllist .name { font-size: 14px; word-break: break-all; }
+  #dllist .meta { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
+  #dllist .acts { display: flex; gap: 8px; }
+  #dllist a, #dllist button { width: auto; height: auto; padding: 8px 14px; font-size: 14px; border-radius: 8px; text-decoration: none;
+    border: 1px solid var(--line); color: var(--text); background: var(--surface); }
+  #dllist a.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  #dlclose { width: 100%; height: 44px; font-size: 16px; border: 1px solid var(--line); }
   #toast { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 20px); max-width: 90vw; padding: 10px 16px;
     background: var(--text); color: var(--bg); border-radius: 12px; font-size: 14px; opacity: 0; pointer-events: none; transition: .25s; z-index: 5; }
   #toast.on { opacity: .95; transform: translate(-50%, 0); }
@@ -79,8 +110,13 @@
   <button id="fwd" aria-label="Forward">›</button>
   <button id="reload" aria-label="Reload">↻</button>
   <input id="url" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Search or enter address" aria-label="Address">
-  <button id="home" aria-label="Home">⌂</button>
+  <button id="menu" aria-label="Menu" aria-haspopup="true">⋮<span id="dlcount"></span></button>
 </header>
+<div id="menu-pop" role="menu" hidden>
+  <button id="m-home" role="menuitem">Home</button>
+  <button id="m-hist" role="menuitem">History</button>
+  <button id="m-dl" role="menuitem" hidden>Save media from this page</button>
+</div>
 <div id="bar"></div>
 <main>
   <iframe id="frame" title="Page" allow="fullscreen" referrerpolicy="same-origin" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"></iframe>
@@ -96,6 +132,20 @@
 </main>
 
 <div id="toast" role="status"></div>
+<dialog id="dldlg">
+  <h2>Save from this page</h2>
+  <p>Plain video and audio files found on the page.</p>
+  <ul id="dllist"></ul>
+  <button id="dlclose" type="button">Close</button>
+</dialog>
+<dialog id="histdlg">
+  <h2>History</h2>
+  <p>Saved only on this device.</p>
+  <input id="histq" type="search" placeholder="Search history" autocomplete="off">
+  <label class="offrow"><input id="histoff" type="checkbox"> Don't save history</label>
+  <ul id="histlist"></ul>
+  <div class="histbar"><button id="histclear" type="button">Clear all</button><button id="histclose" type="button">Close</button></div>
+</dialog>
 <dialog id="keydlg">
   <form id="keyform">
     <h2>Access key</h2>
@@ -123,9 +173,164 @@ function normalize(v) {
   return { query: v };
 }
 
+// Plain media files the open page is using (reported by the page script)
+let media = [];
+function setMedia(list) {
+  media = Array.isArray(list) ? list.filter((m) => m && typeof m.url === 'string') : [];
+  $('m-dl').hidden = media.length === 0;
+  $('dlcount').textContent = media.length || '';
+}
+function fileName(u, kind) {
+  try {
+    const n = decodeURIComponent(new URL(u).pathname.split('/').filter(Boolean).pop() || '');
+    if (n) return n;
+  } catch {}
+  return kind === 'audio' ? 'audio' : 'video';
+}
+function showMedia() {
+  const ul = $('dllist');
+  ul.replaceChildren();
+  for (const m of media) {
+    const li = document.createElement('li');
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = fileName(m.url, m.kind);
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = m.kind === 'stream' ? 'Streaming playlist: not a single file' : m.kind === 'audio' ? 'Audio file' : 'Video file';
+    const acts = document.createElement('div');
+    acts.className = 'acts';
+    if (m.kind !== 'stream') {
+      const a = document.createElement('a');
+      a.className = 'primary';
+      a.textContent = 'Download';
+      a.href = proxyUrl(m.url);
+      a.download = fileName(m.url, m.kind);
+      acts.append(a);
+    }
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.textContent = 'Copy link';
+    copy.onclick = async () => { try { await navigator.clipboard.writeText(m.url); toast('Link copied'); } catch { toast('Could not copy'); } };
+    acts.append(copy);
+    li.append(name, meta, acts);
+    ul.append(li);
+  }
+  $('dldlg').showModal();
+}
+$('dlclose').onclick = () => $('dldlg').close();
+
+// Browsing history, kept only in this browser's localStorage
+const HKEY = 'vrows-history', HOFF = 'vrows-history-off', HMAX = 500;
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const loadHistory = () => {
+  try { const a = JSON.parse(store.get(HKEY) || '[]'); return Array.isArray(a) ? a : []; } catch { return []; }
+};
+const saveHistory = (a) => store.set(HKEY, JSON.stringify(a.slice(0, HMAX)));
+
+function recordVisit(url, title) {
+  if (!url || store.get(HOFF) === '1') return;
+  const a = loadHistory();
+  const now = Date.now();
+  if (a[0] && a[0].u === url) {
+    if (title) a[0].t = title;
+    a[0].at = now;
+  } else {
+    a.unshift({ u: url, t: title || '', at: now, s: /^https?:\/\//i.test(url) ? 0 : 1 });
+  }
+  saveHistory(a);
+}
+
+function dayLabel(ts) {
+  const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diff = Math.round((day(new Date()) - day(new Date(ts))) / 864e5);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function hostOf(u) {
+  try { const x = new URL(u); return x.host + (x.pathname !== '/' ? x.pathname : ''); } catch { return u; }
+}
+
+function renderHistory() {
+  const q = $('histq').value.trim().toLowerCase();
+  const ul = $('histlist');
+  ul.replaceChildren();
+  const items = loadHistory().filter((e) => !q || (e.t + ' ' + e.u).toLowerCase().includes(q)).slice(0, 200);
+  if (!items.length) {
+    const p = document.createElement('li');
+    p.className = 'empty';
+    p.textContent = q ? 'Nothing matches.' : 'No history yet.';
+    ul.append(p);
+    return;
+  }
+  let lastDay = '';
+  for (const e of items) {
+    const label = dayLabel(e.at);
+    if (label !== lastDay) {
+      const d = document.createElement('li');
+      d.className = 'day';
+      d.textContent = label;
+      ul.append(d);
+      lastDay = label;
+    }
+    const li = document.createElement('li');
+    li.className = 'row';
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'open';
+    const t = document.createElement('span');
+    t.className = 't';
+    t.textContent = e.s ? e.u : e.t || hostOf(e.u);
+    const s = document.createElement('span');
+    s.className = 's';
+    s.textContent = (e.s ? 'Search' : hostOf(e.u)) + ' · ' + new Date(e.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    open.append(t, s);
+    open.onclick = () => { $('histdlg').close(); go(e.u); };
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.setAttribute('aria-label', 'Remove');
+    del.textContent = '✕';
+    del.onclick = () => {
+      saveHistory(loadHistory().filter((x) => !(x.at === e.at && x.u === e.u)));
+      renderHistory();
+    };
+    li.append(open, del);
+    ul.append(li);
+  }
+}
+
+function showHistory() {
+  $('histq').value = '';
+  $('histoff').checked = store.get(HOFF) === '1';
+  renderHistory();
+  $('histdlg').showModal();
+}
+$('histq').addEventListener('input', renderHistory);
+$('histoff').addEventListener('change', (e) => store.set(HOFF, e.target.checked ? '1' : '0'));
+$('histclose').onclick = () => $('histdlg').close();
+$('histclear').onclick = () => {
+  if (!loadHistory().length || !confirm('Clear all history?')) return;
+  saveHistory([]);
+  renderHistory();
+  toast('History cleared');
+};
+
+// Menu
+const pop = $('menu-pop');
+$('menu').addEventListener('click', (e) => { e.stopPropagation(); pop.hidden = !pop.hidden; });
+document.addEventListener('click', () => { pop.hidden = true; });
+window.addEventListener('blur', () => { pop.hidden = true; }); // a tap inside the page blurs this window
+
 function go(raw) {
   const t = normalize(raw);
   if (!t) return;
+  setMedia([]);
   start.hidden = true;
   input.value = t.site || t.query;
   bar.className = '';
@@ -135,6 +340,7 @@ function go(raw) {
 }
 
 function showHome() {
+  setMedia([]);
   frame.src = 'about:blank';
   start.hidden = false;
   input.value = '';
@@ -170,8 +376,10 @@ frame.addEventListener('load', () => {
 window.addEventListener('message', (e) => {
   if (e.source !== frame.contentWindow || !e.data || !e.data.vp) return;
   if (e.data.vp === 2) { intent = { url: e.data.intent, at: Date.now() }; return; }
+  if (e.data.vp === 3) { setMedia(e.data.media); return; }
   bar.className = '';
   lastUrl = e.data.url;
+  recordVisit(e.data.url, e.data.title);
   if (document.activeElement !== input) input.value = e.data.url;
   if (e.data.title) document.title = e.data.title;
 });
@@ -180,7 +388,9 @@ const withFrame = (fn) => () => { try { fn(frame.contentWindow); } catch {} };
 $('back').onclick = withFrame((w) => w.history.back());
 $('fwd').onclick = withFrame((w) => w.history.forward());
 $('reload').onclick = withFrame((w) => w.location.reload());
-$('home').onclick = showHome;
+$('m-home').onclick = showHome;
+$('m-dl').onclick = showMedia;
+$('m-hist').onclick = showHistory;
 
 input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { go(input.value); input.blur(); } });
 input.addEventListener('focus', () => input.select());

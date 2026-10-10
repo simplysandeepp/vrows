@@ -2,6 +2,7 @@ import { text, proxyUrl, realFromProxyPath, isBlockedHost } from './util.js';
 import { jarFromRequest, cookieHeader, absorbSetCookies } from './cookies.js';
 import { rewriteHtml, rewriteCss, rewriteJs, MAX_JS_REWRITE } from './rewrite.js';
 import { search } from './search.js';
+import { isAdRequest, blockedResponse, isYouTubeHost, stripYouTubeAds } from './adblock.js';
 
 const SHELL = new Set([
   '/', '/index.html', '/manifest.webmanifest', '/sw.js',
@@ -38,7 +39,7 @@ export default {
       const deny = denied(request, env);
       if (deny) return deny;
       if (path === '/api/check') return text('ok', 200);
-      return path === '/api/search' ? search(url) : proxy(request, url);
+      return path === '/api/search' ? search(url) : proxy(request, url, env);
     }
 
     if (!SHELL.has(path)) {
@@ -95,7 +96,7 @@ function fromReferer(request, url) {
   return new Response(null, { status: 307, headers: { location: proxyUrl(real.href) } });
 }
 
-async function proxy(request, url) {
+async function proxy(request, url, env) {
   let target = realFromProxyPath(url.pathname + url.search);
   if (!target) return text('Bad address', 400);
   if (target.protocol !== 'http:' && target.protocol !== 'https:') return text('Only http/https', 400);
@@ -104,6 +105,7 @@ async function proxy(request, url) {
   const page = pageFromReferer(request, url);
   if (target.host === url.host && page) target = new URL(target.pathname + target.search, page);
   if (target.host === url.host || isBlockedHost(target.hostname)) return text('Blocked target', 403);
+  if (env.ADBLOCK !== 'off' && isAdRequest(target)) return blockedResponse(request);
 
   const headers = new Headers();
   for (const [name, value] of request.headers) {
@@ -175,7 +177,10 @@ async function proxy(request, url) {
 
   if (type.includes('text/html')) {
     out.set('cache-control', 'no-store');
-    return rewriteHtml(new Response(res.body, { status: res.status, headers: out }), target.href);
+    return rewriteHtml(new Response(res.body, { status: res.status, headers: out }), target.href, env.ADBLOCK !== 'off');
+  }
+  if (type.includes('json') && env.ADBLOCK !== 'off' && isYouTubeHost(target.hostname) && target.pathname.startsWith('/youtubei/')) {
+    return new Response(stripYouTubeAds(await res.text()), { status: res.status, headers: out });
   }
   if (type.includes('text/css')) {
     return new Response(rewriteCss(await res.text(), target.href), { status: res.status, headers: out });

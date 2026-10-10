@@ -1,5 +1,6 @@
 import { proxyUrl } from './util.js';
 import { clientScript } from './client.js';
+import { isYouTubeHost, stripYouTubeAds } from './adblock.js';
 
 const URL_ATTRS = ['href', 'src', 'action', 'poster', 'data-src', 'data-original', 'formaction'];
 const SRCSET_ATTRS = ['srcset', 'data-srcset'];
@@ -49,8 +50,9 @@ export function rewriteJs(code) {
 
 const isJsType = (t) => !t || /javascript|ecmascript|module/i.test(t);
 
-export function rewriteHtml(response, pageUrl) {
+export function rewriteHtml(response, pageUrl, adblock = true) {
   const ctx = { base: pageUrl };
+  const stripYtAds = adblock && isYouTubeHost(new URL(pageUrl).hostname);
   const script = clientScript(pageUrl);
 
   return new HTMLRewriter()
@@ -94,7 +96,8 @@ export function rewriteHtml(response, pageUrl) {
         this.buf += chunk.text;
         chunk.remove();
         if (chunk.lastInTextNode) {
-          chunk.after(rewriteJs(this.buf), { html: true });
+          const code = stripYtAds ? stripYouTubeAds(this.buf) : this.buf;
+          chunk.after(rewriteJs(code), { html: true });
           this.buf = '';
         }
       },
