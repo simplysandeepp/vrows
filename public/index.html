@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vrows</title>
+<meta name="theme-color" content="#0f1420">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/icon-192.png">
+<style>
+  :root {
+    --bg: #f5f6f8; --surface: #ffffff; --text: #151a24; --muted: #6a7384;
+    --line: #dde1e8; --accent: #3b6cf6; --accent-text: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b0f18; --surface: #141a27; --text: #e8ecf4; --muted: #8b95a8;
+      --line: #263045; --accent: #5b86ff; --accent-text: #0b0f18;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+    padding-top: env(safe-area-inset-top);
+  }
+  header {
+    display: flex; gap: 6px; align-items: center; padding: 8px 10px;
+    background: var(--surface); border-bottom: 1px solid var(--line);
+  }
+  button {
+    font: inherit; color: var(--text); background: transparent; border: 0;
+    width: 40px; height: 40px; border-radius: 10px; font-size: 20px; cursor: pointer; flex: none;
+  }
+  button:hover, button:focus-visible { background: var(--bg); }
+  #url {
+    flex: 1; min-width: 0; height: 40px; padding: 0 14px; font: inherit; font-size: 16px;
+    color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 20px; outline: none;
+  }
+  #url:focus { border-color: var(--accent); }
+  #bar { height: 2px; background: var(--accent); width: 0; transition: width .3s; }
+  #bar.on { width: 70%; transition: width 8s cubic-bezier(.1,.7,.3,1); }
+  main { flex: 1; position: relative; min-height: 0; }
+  iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+  #start {
+    position: absolute; inset: 0; overflow: auto; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px 16px; text-align: center; gap: 8px;
+  }
+  #start[hidden] { display: none; }
+  #start h1 { margin: 0; font-size: 28px; letter-spacing: -.02em; }
+  #start p { margin: 0 0 16px; color: var(--muted); }
+  .links { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 420px; }
+  .links button {
+    width: auto; height: auto; padding: 10px 16px; font-size: 15px;
+    background: var(--surface); border: 1px solid var(--line);
+  }
+  dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--text); padding: 20px; width: min(92vw, 360px); }
+  dialog::backdrop { background: rgba(0,0,0,.5); }
+  dialog h2 { margin: 0 0 4px; font-size: 18px; }
+  dialog p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+  dialog input { width: 100%; height: 44px; padding: 0 12px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+  dialog .save { width: 100%; margin-top: 12px; height: 44px; font-size: 16px; background: var(--accent); color: var(--accent-text); }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 20px); max-width: 90vw; padding: 10px 16px;
+    background: var(--text); color: var(--bg); border-radius: 12px; font-size: 14px; opacity: 0; pointer-events: none; transition: .25s; z-index: 5; }
+  #toast.on { opacity: .95; transform: translate(-50%, 0); }
+  #err { color: #d64545; font-size: 14px; min-height: 20px; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <button id="back" aria-label="Back">‹</button>
+  <button id="fwd" aria-label="Forward">›</button>
+  <button id="reload" aria-label="Reload">↻</button>
+  <input id="url" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Search or enter address" aria-label="Address">
+  <button id="home" aria-label="Home">⌂</button>
+</header>
+<div id="bar"></div>
+<main>
+  <iframe id="frame" title="Page" allow="fullscreen" referrerpolicy="same-origin" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"></iframe>
+  <section id="start">
+    <h1>Vrows</h1>
+    <p>Type an address or search above.</p>
+    <div class="links">
+      <button data-go="https://en.wikipedia.org">Wikipedia</button>
+      <button data-go="https://www.bbc.com/news">BBC News</button>
+      <button data-go="https://lobste.rs">Lobsters</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast" role="status"></div>
+<dialog id="keydlg">
+  <form id="keyform">
+    <h2>Access key</h2>
+    <p>Enter the key you set for this proxy.</p>
+    <input id="keyin" type="password" autocomplete="off" placeholder="Access key" required>
+    <p id="err"></p>
+    <button class="save" type="submit">Save</button>
+  </form>
+</dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const frame = $('frame'), input = $('url'), start = $('start'), bar = $('bar'), dlg = $('keydlg');
+const proxyUrl = (u) => {
+  const x = new URL(u);
+  return '/p/' + x.protocol.slice(0, -1) + '/' + x.host + x.pathname + x.search + x.hash;
+};
+const searchUrl = (q) => '/api/search?q=' + encodeURIComponent(q);
+
+function normalize(v) {
+  v = v.trim();
+  if (!v) return null;
+  if (/^https?:\/\//i.test(v)) return { site: v };
+  if (!/\s/.test(v) && /^[^\s/]+\.[^\s/]{2,}(\/.*)?$/.test(v)) return { site: 'https://' + v };
+  return { query: v };
+}
+
+function go(raw) {
+  const t = normalize(raw);
+  if (!t) return;
+  start.hidden = true;
+  input.value = t.site || t.query;
+  bar.className = '';
+  void bar.offsetWidth;
+  bar.className = 'on';
+  frame.src = t.site ? proxyUrl(t.site) : searchUrl(t.query);
+}
+
+function showHome() {
+  frame.src = 'about:blank';
+  start.hidden = false;
+  input.value = '';
+  document.title = 'Vrows';
+}
+
+const toast = (msg) => {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('on'), 2800);
+};
+
+// Where the page is (real address) and what the user last tapped. If a script drags the frame
+// out of the proxy (ad hijack, frame-buster), bring the user to what they actually asked for.
+let lastUrl = '';
+let intent = null;
+let recoveries = [];
+frame.addEventListener('load', () => {
+  bar.className = '';
+  if (frame.getAttribute('src') === 'about:blank') return;
+  try { void frame.contentWindow.location.href; return; } catch { /* left our origin */ }
+  const now = Date.now();
+  recoveries = recoveries.filter((t) => now - t < 10000);
+  const target = intent && now - intent.at < 5000 ? intent.url : lastUrl;
+  if (!target || recoveries.length >= 2) { toast('A redirect to another site was blocked'); return; }
+  recoveries.push(now);
+  toast('Blocked a redirect to another site');
+  go(target);
+});
+
+window.addEventListener('message', (e) => {
+  if (e.source !== frame.contentWindow || !e.data || !e.data.vp) return;
+  if (e.data.vp === 2) { intent = { url: e.data.intent, at: Date.now() }; return; }
+  bar.className = '';
+  lastUrl = e.data.url;
+  if (document.activeElement !== input) input.value = e.data.url;
+  if (e.data.title) document.title = e.data.title;
+});
+
+const withFrame = (fn) => () => { try { fn(frame.contentWindow); } catch {} };
+$('back').onclick = withFrame((w) => w.history.back());
+$('fwd').onclick = withFrame((w) => w.history.forward());
+$('reload').onclick = withFrame((w) => w.location.reload());
+$('home').onclick = showHome;
+
+input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { go(input.value); input.blur(); } });
+input.addEventListener('focus', () => input.select());
+document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => go(b.dataset.go)));
+
+// The access key is exchanged for an HttpOnly cookie; it is never stored by this page.
+async function checkKey() {
+  try {
+    const r = await fetch('/api/check');
+    if (r.status === 401) dlg.showModal();
+    else if (r.status === 500) start.querySelector('p').textContent = 'Proxy is not configured yet.';
+  } catch {}
+}
+$('keyform').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('err').textContent = '';
+  try {
+    const r = await fetch('/api/login', { method: 'POST', body: $('keyin').value.trim() });
+    if (r.ok) { dlg.close(); $('keyin').value = ''; }
+    else $('err').textContent = r.status === 401 ? 'Wrong key, try again.' : 'Could not sign in.';
+  } catch { $('err').textContent = 'Could not reach the server.'; }
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+checkKey();
+</script>
+</body>
+</html>

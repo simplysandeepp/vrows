@@ -1,0 +1,16 @@
+{
+  "name": "vrows",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Simple installable web app for browsing through your own Cloudflare Worker",
+  "license": "MIT",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.149.0"
+  }
+}
