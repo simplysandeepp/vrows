@@ -248,6 +248,9 @@ window.addEventListener('message',function(e){
   }
 });
 
+// lets the shell show its loading indicator when a link inside the page is followed
+window.addEventListener('beforeunload',function(){try{parent.postMessage({vp:4},'*')}catch(e){}});
+
 document.addEventListener('DOMContentLoaded',notify);
 window.addEventListener('load',notify);
 notify();

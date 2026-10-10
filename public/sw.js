@@ -1,4 +1,4 @@
-const CACHE = 'vrows-shell-v1';
+const CACHE = 'vrows-shell-v2';
 const SHELL = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {

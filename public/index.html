@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Vrows</title>
-<meta name="theme-color" content="#0f1420">
+<meta name="theme-color" content="#03040a">
+<meta name="color-scheme" content="dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,158 +14,283 @@
 <link rel="icon" href="/icon-192.png">
 <style>
   :root {
-    --bg: #f5f6f8; --surface: #ffffff; --text: #151a24; --muted: #6a7384;
-    --line: #dde1e8; --accent: #3b6cf6; --accent-text: #ffffff;
+    color-scheme: dark;
+    --bg: #03040a; --glass: rgba(255,255,255,.07); --glass-2: rgba(255,255,255,.12);
+    --line: rgba(255,255,255,.14); --text: #eef0ff; --muted: #9ba1c9;
+    --accent: #8b7bff; --accent-2: #4fd1ff; --danger: #ff6b81;
+    --chrome: rgba(9,11,22,.78);
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0b0f18; --surface: #141a27; --text: #e8ecf4; --muted: #8b95a8;
-      --line: #263045; --accent: #5b86ff; --accent-text: #0b0f18;
-    }
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; background: var(--bg); overscroll-behavior: none; }
   body {
-    background: var(--bg); color: var(--text);
-    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    display: flex; flex-direction: column;
-    padding-top: env(safe-area-inset-top);
+    color: var(--text); touch-action: manipulation;
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
   }
-  header {
-    display: flex; gap: 6px; align-items: center; padding: 8px 10px;
-    background: var(--surface); border-bottom: 1px solid var(--line);
-  }
-  button {
-    font: inherit; color: var(--text); background: transparent; border: 0;
-    width: 40px; height: 40px; border-radius: 10px; font-size: 20px; cursor: pointer; flex: none;
-  }
-  button:hover, button:focus-visible { background: var(--bg); }
-  #url {
-    flex: 1; min-width: 0; height: 40px; padding: 0 14px; font: inherit; font-size: 16px;
-    color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 20px; outline: none;
-  }
-  #url:focus { border-color: var(--accent); }
-  #bar { height: 2px; background: var(--accent); width: 0; transition: width .3s; }
-  #bar.on { width: 70%; transition: width 8s cubic-bezier(.1,.7,.3,1); }
+  svg.i { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; padding: 0; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--bg); padding-top: env(safe-area-inset-top); }
+
+  /* Top bar */
+  #top { padding: 8px 10px; background: var(--chrome); backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%); border-bottom: 1px solid var(--line); z-index: 3; }
+  .pill { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 6px 0 14px; border-radius: 22px; background: var(--glass); border: 1px solid var(--line); transition: border-color .2s, box-shadow .2s; }
+  .pill:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,123,255,.2); }
+  .pill .lead { color: var(--muted); }
+  #url { flex: 1; min-width: 0; height: 100%; padding: 0; font: inherit; font-size: 16px; color: var(--text); background: transparent; border: 0; outline: 0; text-overflow: ellipsis; }
+  #url::placeholder { color: var(--muted); }
+  .pill button.ic { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+  .pill button.ic:active { background: var(--glass-2); }
+  #bar { height: 2px; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); z-index: 3; }
+  #bar.on { width: 75%; transition: width 8s cubic-bezier(.1,.7,.3,1); }
+
+  /* Page area */
   main { flex: 1; position: relative; min-height: 0; }
   iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
-  #start {
-    position: absolute; inset: 0; overflow: auto; background: var(--bg);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 24px 16px; text-align: center; gap: 8px;
-  }
-  #start[hidden] { display: none; }
-  #start h1 { margin: 0; font-size: 28px; letter-spacing: -.02em; }
-  #start p { margin: 0 0 16px; color: var(--muted); }
-  .links { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 420px; }
-  .links button {
-    width: auto; height: auto; padding: 10px 16px; font-size: 15px;
-    background: var(--surface); border: 1px solid var(--line);
-  }
-  dialog { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--text); padding: 20px; width: min(92vw, 360px); }
-  dialog::backdrop { background: rgba(0,0,0,.5); }
-  dialog h2 { margin: 0 0 4px; font-size: 18px; }
-  dialog p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
-  dialog input { width: 100%; height: 44px; padding: 0 12px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
-  dialog .save { width: 100%; margin-top: 12px; height: 44px; font-size: 16px; background: var(--accent); color: var(--accent-text); }
-  #menu { position: relative; }
-  #dlcount { position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
-    background: var(--accent); color: var(--accent-text); font-size: 11px; line-height: 16px; font-weight: 700; }
+
+  /* Bottom dock */
+  #dock { display: grid; grid-template-columns: repeat(5, 1fr); padding: 4px 6px calc(4px + env(safe-area-inset-bottom)); background: var(--chrome); backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%); border-top: 1px solid var(--line); z-index: 3; }
+  #dock button { height: 48px; border-radius: 14px; display: grid; place-items: center; color: var(--text); position: relative; }
+  #dock button:active { background: var(--glass-2); }
+  #dock button:disabled { opacity: .35; }
+  #dock button.on { color: #ffd166; }
+  #dock button.on svg { fill: currentColor; }
+  #dlcount { position: absolute; top: 5px; right: calc(50% - 20px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 11px; line-height: 16px; font-weight: 700; text-align: center; }
   #dlcount:empty { display: none; }
-  #menu-pop { position: fixed; top: calc(env(safe-area-inset-top) + 54px); right: 10px; z-index: 6; min-width: 190px; padding: 6px;
-    background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+
+  /* Home: glossy black galaxy */
+  #start { position: absolute; inset: 0; overflow: hidden; background: radial-gradient(120% 90% at 50% 110%, #0b0a22 0%, #04050d 55%, #010208 100%); display: grid; place-items: center; padding: 24px 18px; z-index: 2; }
+  #start[hidden] { display: none; }
+  #start .core { position: absolute; left: 50%; top: 52%; width: 150vmax; height: 150vmax; margin: -75vmax 0 0 -75vmax; pointer-events: none;
+    background: conic-gradient(from 0deg, transparent 0 8%, rgba(139,123,255,.30) 16%, transparent 30%, rgba(79,209,255,.20) 46%, transparent 60%, rgba(214,92,255,.22) 76%, transparent 90%);
+    filter: blur(70px); opacity: .75; animation: spin 140s linear infinite; mask-image: radial-gradient(closest-side, #000 0 35%, transparent 72%); -webkit-mask-image: radial-gradient(closest-side, #000 0 35%, transparent 72%); }
+  #start .haze { position: absolute; inset: 0; pointer-events: none; background:
+      radial-gradient(40% 35% at 18% 22%, rgba(120,90,255,.18), transparent 70%),
+      radial-gradient(38% 32% at 86% 78%, rgba(40,190,255,.14), transparent 70%),
+      radial-gradient(30% 26% at 70% 14%, rgba(255,90,200,.10), transparent 70%); animation: drift 38s ease-in-out infinite alternate; }
+  #galaxy { position: absolute; inset: 0; width: 100%; height: 100%; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes drift { from { transform: translate3d(-2%, -1%, 0) scale(1); } to { transform: translate3d(2%, 2%, 0) scale(1.08); } }
+  .home { position: relative; width: min(100%, 560px); display: grid; gap: 18px; justify-items: center; text-align: center; margin-top: -4vh; }
+  #clock { font-size: clamp(54px, 15vw, 92px); font-weight: 200; letter-spacing: -.03em; line-height: 1; background: linear-gradient(180deg, #fff 10%, rgba(190,198,255,.55)); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 40px rgba(139,123,255,.35); }
+  #date { color: var(--muted); font-size: 14px; letter-spacing: .12em; text-transform: uppercase; margin-top: -8px; }
+  .brand { font-size: 15px; font-weight: 600; letter-spacing: .5em; text-transform: uppercase; color: rgba(255,255,255,.55); margin-bottom: 6px; padding-left: .5em; }
+  .search { position: relative; width: 100%; height: 58px; display: flex; align-items: center; gap: 12px; padding: 0 8px 0 20px; border-radius: 29px; overflow: hidden;
+    background: linear-gradient(135deg, rgba(255,255,255,.16), rgba(255,255,255,.04) 55%, rgba(255,255,255,.08));
+    border: 1px solid rgba(255,255,255,.2); backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.38), inset 0 -10px 24px rgba(0,0,0,.28), 0 24px 70px rgba(0,0,0,.65), 0 0 50px rgba(139,123,255,.22); transition: box-shadow .25s, border-color .25s; }
+  .search::before { content: ""; position: absolute; left: -20%; top: -120%; width: 140%; height: 200%; pointer-events: none; transform: rotate(-12deg); background: linear-gradient(180deg, rgba(255,255,255,.22), transparent 55%); }
+  .search:focus-within { border-color: rgba(160,150,255,.8); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -10px 24px rgba(0,0,0,.28), 0 24px 70px rgba(0,0,0,.65), 0 0 70px rgba(139,123,255,.45); }
+  .search svg { color: rgba(255,255,255,.7); position: relative; }
+  #hq { position: relative; flex: 1; min-width: 0; height: 100%; padding: 0; font: inherit; font-size: 17px; color: #fff; background: transparent; border: 0; outline: 0; }
+  #hq::placeholder { color: rgba(255,255,255,.5); }
+  .go { position: relative; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--accent), #5d8bff); box-shadow: 0 6px 20px rgba(110,100,255,.5), inset 0 1px 0 rgba(255,255,255,.4); }
+  .go:active { transform: scale(.94); }
+  #tiles { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; max-width: 460px; }
+  #tiles:empty { display: none; }
+  .tile { width: 76px; display: grid; justify-items: center; gap: 6px; color: var(--text); font-size: 12px; }
+  .tile .ico { width: 54px; height: 54px; border-radius: 18px; display: grid; place-items: center; font-size: 22px; font-weight: 600; text-transform: uppercase;
+    background: linear-gradient(135deg, rgba(255,255,255,.18), rgba(255,255,255,.04)); border: 1px solid rgba(255,255,255,.18); box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 10px 30px rgba(0,0,0,.5); backdrop-filter: blur(12px); }
+  .tile span.n { max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  body.home #top { display: none; }
+  body.home #bar { display: none; }
+  body.home #dock { background: rgba(5,6,14,.55); }
+
+  /* Menu */
+  #menu-pop { position: fixed; right: 10px; bottom: calc(env(safe-area-inset-bottom) + 66px); z-index: 30; min-width: 230px; padding: 6px; border-radius: 18px; background: rgba(16,18,34,.94); border: 1px solid var(--line); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); box-shadow: 0 18px 60px rgba(0,0,0,.6); }
   #menu-pop[hidden] { display: none; }
-  #menu-pop button { display: block; width: 100%; height: auto; padding: 11px 12px; text-align: left; font-size: 15px; border-radius: 9px; }
-  #histq { margin-bottom: 10px; }
-  #histlist { list-style: none; margin: 0 0 12px; padding: 0; max-height: 52vh; overflow: auto; }
-  #histlist .day { margin: 10px 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-  #histlist li.row { display: flex; align-items: center; gap: 4px; border-radius: 10px; }
-  #histlist li.row:hover { background: var(--bg); }
-  #histlist .open { flex: 1; min-width: 0; width: auto; height: auto; padding: 8px 8px; text-align: left; font-size: 14px; border-radius: 10px; }
-  #histlist .t { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #histlist .s { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
-  #histlist .del { flex: none; width: 34px; height: 34px; font-size: 14px; color: var(--muted); }
-  .empty { color: var(--muted); text-align: center; margin: 24px 0; font-size: 14px; }
-  .histbar { display: flex; gap: 8px; }
-  .histbar button { flex: 1; width: auto; height: 44px; font-size: 15px; border: 1px solid var(--line); border-radius: 10px; }
+  #menu-pop button { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 12px; text-align: left; font-size: 15px; border-radius: 12px; }
+  #menu-pop button:active, #menu-pop button:hover { background: var(--glass-2); }
+  #menu-pop button[hidden] { display: none; }
+  #menu-pop hr { border: 0; border-top: 1px solid var(--line); margin: 4px 6px; }
+
+  /* Immersive (fullscreen / rotated) */
+  #float { position: absolute; top: calc(env(safe-area-inset-top) + 10px); right: 10px; display: none; gap: 8px; z-index: 20; }
+  #float button { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(10,12,24,.7); border: 1px solid var(--line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 6px 20px rgba(0,0,0,.5); }
+  body.immersive #float { display: flex; }
+  body.immersive #top, body.immersive #dock, body.immersive #bar { display: none; }
+  body.immersive #app { padding-top: 0; }
+  body.rotated #app { inset: auto; top: 0; left: 100%; width: 100vh; width: 100dvh; height: 100vw; height: 100dvw; transform-origin: 0 0; transform: rotate(90deg); padding: 0; }
+
+  /* Dialogs */
+  dialog { border: 1px solid var(--line); border-radius: 22px; background: rgba(14,16,30,.97); color: var(--text); padding: 20px; width: min(92vw, 400px); box-shadow: 0 30px 90px rgba(0,0,0,.7); }
+  dialog::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  dialog h2 { margin: 0 0 4px; font-size: 19px; }
+  dialog p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+  dialog input[type=text], dialog input[type=search], dialog input[type=password] { width: 100%; height: 46px; padding: 0 14px; font: inherit; color: var(--text); background: var(--glass); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; }
+  .btn { height: 46px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--glass); font-size: 15px; }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), #5d8bff); border-color: transparent; color: #fff; font-weight: 600; }
+  .row2 { display: flex; gap: 8px; } .row2 .btn { flex: 1; }
+  ul.list { list-style: none; margin: 0 0 12px; padding: 0; max-height: 52vh; overflow: auto; }
+  ul.list .day { margin: 10px 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  ul.list li.row { display: flex; align-items: center; gap: 4px; border-radius: 12px; }
+  ul.list li.row:hover { background: var(--glass); }
+  ul.list .open { flex: 1; min-width: 0; padding: 9px 8px; text-align: left; font-size: 14px; border-radius: 12px; }
+  ul.list .t, ul.list .s { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  ul.list .s { color: var(--muted); font-size: 12px; }
+  ul.list .del { flex: none; width: 36px; height: 36px; border-radius: 50%; color: var(--muted); display: grid; place-items: center; }
+  .empty { color: var(--muted); text-align: center; margin: 24px 0; font-size: 14px; list-style: none; }
   .offrow { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; color: var(--muted); font-size: 14px; }
-  .offrow input { width: 18px; height: 18px; }
-  #dllist { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
-  #dllist li { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .offrow input { width: 18px; height: 18px; accent-color: var(--accent); }
+  #dllist li { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-bottom: 8px; }
   #dllist .name { font-size: 14px; word-break: break-all; }
   #dllist .meta { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
   #dllist .acts { display: flex; gap: 8px; }
-  #dllist a, #dllist button { width: auto; height: auto; padding: 8px 14px; font-size: 14px; border-radius: 8px; text-decoration: none;
-    border: 1px solid var(--line); color: var(--text); background: var(--surface); }
-  #dllist a.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-  #dlclose { width: 100%; height: 44px; font-size: 16px; border: 1px solid var(--line); }
-  #toast { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 20px); max-width: 90vw; padding: 10px 16px;
-    background: var(--text); color: var(--bg); border-radius: 12px; font-size: 14px; opacity: 0; pointer-events: none; transition: .25s; z-index: 5; }
-  #toast.on { opacity: .95; transform: translate(-50%, 0); }
-  #err { color: #d64545; font-size: 14px; min-height: 20px; margin: 6px 0 0; }
+  #dllist a, #dllist button { height: auto; padding: 9px 14px; font-size: 14px; border-radius: 10px; text-decoration: none; border: 1px solid var(--line); color: var(--text); background: var(--glass); }
+  #dllist a.primary { background: linear-gradient(135deg, var(--accent), #5d8bff); border-color: transparent; color: #fff; }
+  #err { color: var(--danger); font-size: 14px; min-height: 20px; margin: 0 0 8px; }
+  #toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 84px); transform: translate(-50%, 20px); max-width: 90vw; padding: 10px 16px; background: rgba(240,242,255,.95); color: #0b0d1a; border-radius: 14px; font-size: 14px; opacity: 0; pointer-events: none; transition: .25s; z-index: 40; }
+  #toast.on { opacity: 1; transform: translate(-50%, 0); }
+  @media (prefers-reduced-motion: reduce) { #start .core, #start .haze { animation: none; } }
 </style>
 </head>
-<body>
-<header>
-  <button id="back" aria-label="Back">‹</button>
-  <button id="fwd" aria-label="Forward">›</button>
-  <button id="reload" aria-label="Reload">↻</button>
-  <input id="url" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Search or enter address" aria-label="Address">
-  <button id="menu" aria-label="Menu" aria-haspopup="true">⋮<span id="dlcount"></span></button>
-</header>
-<div id="menu-pop" role="menu" hidden>
-  <button id="m-home" role="menuitem">Home</button>
-  <button id="m-hist" role="menuitem">History</button>
-  <button id="m-dl" role="menuitem" hidden>Save media from this page</button>
-</div>
-<div id="bar"></div>
-<main>
-  <iframe id="frame" title="Page" allow="fullscreen" referrerpolicy="same-origin" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"></iframe>
-  <section id="start">
-    <h1>Vrows</h1>
-    <p>Type an address or search above.</p>
-    <div class="links">
-      <button data-go="https://en.wikipedia.org">Wikipedia</button>
-      <button data-go="https://www.bbc.com/news">BBC News</button>
-      <button data-go="https://lobste.rs">Lobsters</button>
+<body class="home">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="i-reload" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9 6.8 19.7l1-5.9L3.5 9.7l5.9-.8z"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M8 7.5L12 3.5l4 4"/><path d="M6 11H5v9h14v-9h-1"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/></symbol>
+    <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-rotate" viewBox="0 0 24 24"><rect x="3.5" y="8" width="12" height="9" rx="2" transform="rotate(-30 9.5 12.5)"/><path d="M17.5 4.5a8 8 0 0 1 3 6.5M20.5 11l1-3M20.5 11l-3-.8"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3.5 4.5V9H8"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19.5h14"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  </defs>
+</svg>
+
+<div id="app">
+  <header id="top">
+    <div class="pill">
+      <svg class="i lead" id="lead"><use href="#i-globe"/></svg>
+      <input id="url" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Search or enter address" aria-label="Address">
+      <button class="ic" id="reload" aria-label="Reload"><svg class="i"><use href="#i-reload"/></svg></button>
     </div>
-  </section>
-</main>
+  </header>
+  <div id="bar"></div>
+  <main>
+    <iframe id="frame" title="Page" allow="fullscreen; autoplay; picture-in-picture" allowfullscreen referrerpolicy="same-origin" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"></iframe>
+    <section id="start">
+      <div class="core"></div><div class="haze"></div>
+      <canvas id="galaxy" aria-hidden="true"></canvas>
+      <div class="home">
+        <div class="brand">Vrows</div>
+        <div id="clock">--:--</div>
+        <div id="date"></div>
+        <form class="search" id="hform" autocomplete="off">
+          <svg class="i"><use href="#i-search"/></svg>
+          <input id="hq" type="text" inputmode="url" enterkeyhint="go" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Search or enter address" aria-label="Search or enter address">
+          <button class="go" type="submit" aria-label="Go"><svg class="i"><use href="#i-arrow"/></svg></button>
+        </form>
+        <div id="tiles"></div>
+      </div>
+    </section>
+  </main>
+  <nav id="dock" aria-label="Browser controls">
+    <button id="back" aria-label="Back"><svg class="i"><use href="#i-back"/></svg></button>
+    <button id="fwd" aria-label="Forward"><svg class="i"><use href="#i-fwd"/></svg></button>
+    <button id="m-home" aria-label="Home"><svg class="i"><use href="#i-home"/></svg></button>
+    <button id="bm" aria-label="Bookmark this page"><svg class="i"><use href="#i-star"/></svg></button>
+    <button id="menu" aria-label="Menu" aria-haspopup="true"><svg class="i"><use href="#i-menu"/></svg><span id="dlcount"></span></button>
+  </nav>
+  <div id="float">
+    <button id="f-rotate" aria-label="Rotate"><svg class="i"><use href="#i-rotate"/></svg></button>
+    <button id="f-exit" aria-label="Exit full screen"><svg class="i"><use href="#i-x"/></svg></button>
+  </div>
+</div>
+
+<div id="menu-pop" role="menu" hidden>
+  <button id="m-dl" role="menuitem" hidden><svg class="i"><use href="#i-download"/></svg>Save media from this page</button>
+  <button id="m-full" role="menuitem"><svg class="i"><use href="#i-full"/></svg>Full screen</button>
+  <button id="m-rotate" role="menuitem"><svg class="i"><use href="#i-rotate"/></svg>Rotate (landscape)</button>
+  <hr>
+  <button id="m-bm" role="menuitem"><svg class="i"><use href="#i-bookmark"/></svg>Bookmarks</button>
+  <button id="m-hist" role="menuitem"><svg class="i"><use href="#i-history"/></svg>History</button>
+  <hr>
+  <button id="m-share" role="menuitem"><svg class="i"><use href="#i-share"/></svg>Share</button>
+  <button id="m-copy" role="menuitem"><svg class="i"><use href="#i-copy"/></svg>Copy link</button>
+</div>
 
 <div id="toast" role="status"></div>
+
 <dialog id="dldlg">
   <h2>Save from this page</h2>
   <p>Plain video and audio files found on the page.</p>
-  <ul id="dllist"></ul>
-  <button id="dlclose" type="button">Close</button>
+  <ul class="list" id="dllist"></ul>
+  <button class="btn" id="dlclose" type="button" style="width:100%">Close</button>
 </dialog>
+
 <dialog id="histdlg">
   <h2>History</h2>
   <p>Saved only on this device.</p>
   <input id="histq" type="search" placeholder="Search history" autocomplete="off">
   <label class="offrow"><input id="histoff" type="checkbox"> Don't save history</label>
-  <ul id="histlist"></ul>
-  <div class="histbar"><button id="histclear" type="button">Clear all</button><button id="histclose" type="button">Close</button></div>
+  <ul class="list" id="histlist"></ul>
+  <div class="row2"><button class="btn" id="histclear" type="button">Clear all</button><button class="btn" id="histclose" type="button">Close</button></div>
 </dialog>
+
+<dialog id="bmdlg">
+  <h2>Bookmarks</h2>
+  <p>Saved only on this device.</p>
+  <ul class="list" id="bmlist"></ul>
+  <button class="btn" id="bmclose" type="button" style="width:100%">Close</button>
+</dialog>
+
 <dialog id="keydlg">
   <form id="keyform">
     <h2>Access key</h2>
     <p>Enter the key you set for this proxy.</p>
     <input id="keyin" type="password" autocomplete="off" placeholder="Access key" required>
     <p id="err"></p>
-    <button class="save" type="submit">Save</button>
+    <button class="btn primary" type="submit" style="width:100%">Continue</button>
   </form>
 </dialog>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const frame = $('frame'), input = $('url'), start = $('start'), bar = $('bar'), dlg = $('keydlg');
+const body = document.body;
+const frame = $('frame'), input = $('url'), start = $('start'), bar = $('bar'), keyDlg = $('keydlg');
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const readJson = (k) => { try { const a = JSON.parse(store.get(k) || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
+const icon = (id) => {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('class', 'i');
+  const u = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+  u.setAttribute('href', '#i-' + id);
+  s.append(u);
+  return s;
+};
+
 const proxyUrl = (u) => {
   const x = new URL(u);
   return '/p/' + x.protocol.slice(0, -1) + '/' + x.host + x.pathname + x.search + x.hash;
 };
 const searchUrl = (q) => '/api/search?q=' + encodeURIComponent(q);
+const isWeb = (u) => /^https?:\/\//i.test(u || '');
+const hostOf = (u) => { try { const x = new URL(u); return x.host + (x.pathname !== '/' ? x.pathname : ''); } catch { return u; } };
 
+const toast = (msg) => {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('on'), 2400);
+};
+
+/* ---------- Navigation ---------- */
 function normalize(v) {
   v = v.trim();
   if (!v) return null;
@@ -173,7 +299,314 @@ function normalize(v) {
   return { query: v };
 }
 
-// Plain media files the open page is using (reported by the page script)
+let curUrl = '', curTitle = '', loading = false;
+
+let loadTimer = 0;
+function setLoading(on) {
+  loading = on;
+  clearTimeout(loadTimer);
+  if (on) loadTimer = setTimeout(() => setLoading(false), 20000); // never leave it spinning
+  $('reload').querySelector('use').setAttribute('href', on ? '#i-stop' : '#i-reload');
+  $('reload').setAttribute('aria-label', on ? 'Stop' : 'Reload');
+  bar.className = '';
+  if (on) { void bar.offsetWidth; bar.className = 'on'; }
+}
+
+function setHome(on) {
+  body.classList.toggle('home', on);
+  start.hidden = !on;
+  galaxy.run(on);
+  updateBookmarkButton();
+}
+
+function go(raw) {
+  const t = normalize(raw);
+  if (!t) return;
+  setMedia([]);
+  setHome(false);
+  input.value = t.site || t.query;
+  curUrl = '';
+  curTitle = '';
+  setLoading(true);
+  frame.src = t.site ? proxyUrl(t.site) : searchUrl(t.query);
+}
+
+function showHome() {
+  exitImmersive();
+  setMedia([]);
+  frame.src = 'about:blank';
+  input.value = '';
+  curUrl = '';
+  document.title = 'Vrows';
+  setLoading(false);
+  setHome(true);
+  renderTiles();
+}
+
+const withFrame = (fn) => () => { try { fn(frame.contentWindow); } catch {} };
+$('back').onclick = withFrame((w) => w.history.back());
+$('fwd').onclick = withFrame((w) => w.history.forward());
+$('reload').onclick = withFrame((w) => {
+  if (loading) { w.stop(); setLoading(false); }
+  else { setLoading(true); w.location.reload(); }
+});
+$('m-home').onclick = showHome;
+
+input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { go(input.value); input.blur(); } });
+input.addEventListener('focus', () => input.select());
+$('hform').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = $('hq').value;
+  $('hq').blur();
+  go(v);
+  $('hq').value = '';
+});
+
+/* ---------- Page <-> shell messages, escape recovery ---------- */
+let intent = null;
+let recoveries = [];
+frame.addEventListener('load', () => {
+  setLoading(false);
+  if (frame.getAttribute('src') === 'about:blank') return;
+  try { void frame.contentWindow.location.href; return; } catch { /* left our origin */ }
+  const now = Date.now();
+  recoveries = recoveries.filter((t) => now - t < 10000);
+  const target = intent && now - intent.at < 5000 ? intent.url : curUrl;
+  if (!target || recoveries.length >= 2) { toast('A redirect to another site was blocked'); return; }
+  recoveries.push(now);
+  toast('Blocked a redirect to another site');
+  go(target);
+});
+
+window.addEventListener('message', (e) => {
+  if (e.source !== frame.contentWindow || !e.data || !e.data.vp) return;
+  if (e.data.vp === 2) { intent = { url: e.data.intent, at: Date.now() }; return; }
+  if (e.data.vp === 3) { setMedia(e.data.media); return; }
+  if (e.data.vp === 4) { setLoading(true); return; }
+  curUrl = e.data.url || '';
+  curTitle = e.data.title || '';
+  if (document.activeElement !== input) input.value = curUrl;
+  if (curTitle) document.title = curTitle;
+  $('lead').querySelector('use').setAttribute('href', curUrl.startsWith('https:') ? '#i-lock' : '#i-globe');
+  recordVisit(curUrl, curTitle);
+  updateBookmarkButton();
+});
+
+/* ---------- History (localStorage) ---------- */
+const HKEY = 'vrows-history', HOFF = 'vrows-history-off', HMAX = 500;
+const saveHistory = (a) => store.set(HKEY, JSON.stringify(a.slice(0, HMAX)));
+
+function recordVisit(url, title) {
+  if (!url || store.get(HOFF) === '1') return;
+  const a = readJson(HKEY);
+  const now = Date.now();
+  if (a[0] && a[0].u === url) {
+    if (title) a[0].t = title;
+    a[0].at = now;
+  } else {
+    a.unshift({ u: url, t: title || '', at: now, s: isWeb(url) ? 0 : 1 });
+  }
+  saveHistory(a);
+}
+
+function dayLabel(ts) {
+  const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diff = Math.round((day(new Date()) - day(new Date(ts))) / 864e5);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function listRow({ title, sub, onOpen, onDelete }) {
+  const li = document.createElement('li');
+  li.className = 'row';
+  const open = document.createElement('button');
+  open.type = 'button';
+  open.className = 'open';
+  const t = document.createElement('span');
+  t.className = 't';
+  t.textContent = title;
+  const s = document.createElement('span');
+  s.className = 's';
+  s.textContent = sub;
+  open.append(t, s);
+  open.onclick = onOpen;
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'del';
+  del.setAttribute('aria-label', 'Remove');
+  del.append(icon('x'));
+  del.onclick = onDelete;
+  li.append(open, del);
+  return li;
+}
+
+function renderHistory() {
+  const q = $('histq').value.trim().toLowerCase();
+  const ul = $('histlist');
+  ul.replaceChildren();
+  const items = readJson(HKEY).filter((e) => !q || (e.t + ' ' + e.u).toLowerCase().includes(q)).slice(0, 200);
+  if (!items.length) {
+    const p = document.createElement('li');
+    p.className = 'empty';
+    p.textContent = q ? 'Nothing matches.' : 'No history yet.';
+    ul.append(p);
+    return;
+  }
+  let lastDay = '';
+  for (const e of items) {
+    const label = dayLabel(e.at);
+    if (label !== lastDay) {
+      const d = document.createElement('li');
+      d.className = 'day';
+      d.textContent = label;
+      ul.append(d);
+      lastDay = label;
+    }
+    ul.append(listRow({
+      title: e.s ? e.u : e.t || hostOf(e.u),
+      sub: (e.s ? 'Search' : hostOf(e.u)) + ' · ' + new Date(e.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      onOpen: () => { $('histdlg').close(); go(e.u); },
+      onDelete: () => { saveHistory(readJson(HKEY).filter((x) => !(x.at === e.at && x.u === e.u))); renderHistory(); },
+    }));
+  }
+}
+
+function showHistory() {
+  $('histq').value = '';
+  $('histoff').checked = store.get(HOFF) === '1';
+  renderHistory();
+  $('histdlg').showModal();
+}
+$('histq').addEventListener('input', renderHistory);
+$('histoff').addEventListener('change', (e) => store.set(HOFF, e.target.checked ? '1' : '0'));
+$('histclose').onclick = () => $('histdlg').close();
+$('histclear').onclick = () => {
+  if (!readJson(HKEY).length || !confirm('Clear all history?')) return;
+  saveHistory([]);
+  renderHistory();
+  toast('History cleared');
+};
+$('m-hist').onclick = showHistory;
+
+/* ---------- Bookmarks (localStorage) ---------- */
+const BKEY = 'vrows-bookmarks';
+const saveBookmarks = (a) => store.set(BKEY, JSON.stringify(a.slice(0, 200)));
+const isBookmarked = (u) => !!u && readJson(BKEY).some((b) => b.u === u);
+
+function updateBookmarkButton() {
+  const on = isBookmarked(curUrl);
+  $('bm').classList.toggle('on', on);
+  $('bm').disabled = body.classList.contains('home') || !isWeb(curUrl);
+  $('bm').setAttribute('aria-label', on ? 'Remove bookmark' : 'Bookmark this page');
+}
+
+function toggleBookmark() {
+  if (!isWeb(curUrl)) return;
+  const a = readJson(BKEY);
+  const i = a.findIndex((b) => b.u === curUrl);
+  if (i >= 0) { a.splice(i, 1); toast('Bookmark removed'); }
+  else { a.unshift({ u: curUrl, t: curTitle || hostOf(curUrl), at: Date.now() }); toast('Bookmarked'); }
+  saveBookmarks(a);
+  updateBookmarkButton();
+}
+$('bm').onclick = toggleBookmark;
+
+function renderBookmarks() {
+  const ul = $('bmlist');
+  ul.replaceChildren();
+  const items = readJson(BKEY);
+  if (!items.length) {
+    const p = document.createElement('li');
+    p.className = 'empty';
+    p.textContent = 'Tap the star while on a page to save it here.';
+    ul.append(p);
+    return;
+  }
+  for (const b of items) {
+    ul.append(listRow({
+      title: b.t || hostOf(b.u),
+      sub: hostOf(b.u),
+      onOpen: () => { $('bmdlg').close(); go(b.u); },
+      onDelete: () => { saveBookmarks(readJson(BKEY).filter((x) => x.u !== b.u)); renderBookmarks(); renderTiles(); updateBookmarkButton(); },
+    }));
+  }
+}
+$('m-bm').onclick = () => { renderBookmarks(); $('bmdlg').showModal(); };
+$('bmclose').onclick = () => $('bmdlg').close();
+
+function renderTiles() {
+  const box = $('tiles');
+  box.replaceChildren();
+  for (const b of readJson(BKEY).slice(0, 8)) {
+    const a = document.createElement('button');
+    a.type = 'button';
+    a.className = 'tile';
+    const ico = document.createElement('div');
+    ico.className = 'ico';
+    let host = b.u;
+    try { host = new URL(b.u).hostname.replace(/^www\./, ''); } catch {}
+    ico.textContent = host[0] || '?';
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = host;
+    a.append(ico, n);
+    a.onclick = () => go(b.u);
+    box.append(a);
+  }
+}
+
+/* ---------- Share / copy ---------- */
+async function copyText(text, msg) {
+  try { await navigator.clipboard.writeText(text); toast(msg); } catch { toast('Could not copy'); }
+}
+$('m-copy').onclick = () => { if (isWeb(curUrl)) copyText(curUrl, 'Link copied'); else toast('Open a page first'); };
+$('m-share').onclick = async () => {
+  if (!isWeb(curUrl)) { toast('Open a page first'); return; }
+  if (navigator.share) { try { await navigator.share({ title: curTitle || 'Vrows', url: curUrl }); } catch {} }
+  else copyText(curUrl, 'Link copied');
+};
+
+/* ---------- Full screen and rotate (for video) ---------- */
+let fsActive = false;
+async function enterImmersive() {
+  body.classList.add('immersive');
+  try {
+    if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+      await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+      fsActive = true;
+    }
+  } catch { /* no Fullscreen API here (e.g. iPhone): the immersive layout still hides the bars */ }
+}
+function exitImmersive() {
+  body.classList.remove('immersive', 'rotated');
+  try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch {}
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  fsActive = false;
+}
+async function toggleRotate() {
+  if (body.classList.contains('rotated')) { body.classList.remove('rotated'); return; }
+  try {
+    if (screen.orientation && screen.orientation.lock && document.fullscreenElement) {
+      await screen.orientation.lock(screen.orientation.type.startsWith('landscape') ? 'portrait' : 'landscape');
+      return;
+    }
+  } catch { /* orientation lock not allowed: rotate the layout instead */ }
+  body.classList.add('rotated');
+}
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && fsActive) exitImmersive(); });
+$('m-full').onclick = enterImmersive;
+$('m-rotate').onclick = async () => { await enterImmersive(); toggleRotate(); };
+$('f-rotate').onclick = toggleRotate;
+$('f-exit').onclick = exitImmersive;
+
+/* ---------- Menu ---------- */
+const pop = $('menu-pop');
+$('menu').addEventListener('click', (e) => { e.stopPropagation(); pop.hidden = !pop.hidden; });
+document.addEventListener('click', () => { pop.hidden = true; });
+window.addEventListener('blur', () => { pop.hidden = true; }); // a tap inside the page blurs this window
+
+/* ---------- Plain media files found on the page ---------- */
 let media = [];
 function setMedia(list) {
   media = Array.isArray(list) ? list.filter((m) => m && typeof m.url === 'string') : [];
@@ -211,197 +644,21 @@ function showMedia() {
     const copy = document.createElement('button');
     copy.type = 'button';
     copy.textContent = 'Copy link';
-    copy.onclick = async () => { try { await navigator.clipboard.writeText(m.url); toast('Link copied'); } catch { toast('Could not copy'); } };
+    copy.onclick = () => copyText(m.url, 'Link copied');
     acts.append(copy);
     li.append(name, meta, acts);
     ul.append(li);
   }
   $('dldlg').showModal();
 }
+$('m-dl').onclick = showMedia;
 $('dlclose').onclick = () => $('dldlg').close();
 
-// Browsing history, kept only in this browser's localStorage
-const HKEY = 'vrows-history', HOFF = 'vrows-history-off', HMAX = 500;
-const store = {
-  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
-};
-const loadHistory = () => {
-  try { const a = JSON.parse(store.get(HKEY) || '[]'); return Array.isArray(a) ? a : []; } catch { return []; }
-};
-const saveHistory = (a) => store.set(HKEY, JSON.stringify(a.slice(0, HMAX)));
-
-function recordVisit(url, title) {
-  if (!url || store.get(HOFF) === '1') return;
-  const a = loadHistory();
-  const now = Date.now();
-  if (a[0] && a[0].u === url) {
-    if (title) a[0].t = title;
-    a[0].at = now;
-  } else {
-    a.unshift({ u: url, t: title || '', at: now, s: /^https?:\/\//i.test(url) ? 0 : 1 });
-  }
-  saveHistory(a);
-}
-
-function dayLabel(ts) {
-  const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const diff = Math.round((day(new Date()) - day(new Date(ts))) / 864e5);
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Yesterday';
-  return new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function hostOf(u) {
-  try { const x = new URL(u); return x.host + (x.pathname !== '/' ? x.pathname : ''); } catch { return u; }
-}
-
-function renderHistory() {
-  const q = $('histq').value.trim().toLowerCase();
-  const ul = $('histlist');
-  ul.replaceChildren();
-  const items = loadHistory().filter((e) => !q || (e.t + ' ' + e.u).toLowerCase().includes(q)).slice(0, 200);
-  if (!items.length) {
-    const p = document.createElement('li');
-    p.className = 'empty';
-    p.textContent = q ? 'Nothing matches.' : 'No history yet.';
-    ul.append(p);
-    return;
-  }
-  let lastDay = '';
-  for (const e of items) {
-    const label = dayLabel(e.at);
-    if (label !== lastDay) {
-      const d = document.createElement('li');
-      d.className = 'day';
-      d.textContent = label;
-      ul.append(d);
-      lastDay = label;
-    }
-    const li = document.createElement('li');
-    li.className = 'row';
-    const open = document.createElement('button');
-    open.type = 'button';
-    open.className = 'open';
-    const t = document.createElement('span');
-    t.className = 't';
-    t.textContent = e.s ? e.u : e.t || hostOf(e.u);
-    const s = document.createElement('span');
-    s.className = 's';
-    s.textContent = (e.s ? 'Search' : hostOf(e.u)) + ' · ' + new Date(e.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    open.append(t, s);
-    open.onclick = () => { $('histdlg').close(); go(e.u); };
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.className = 'del';
-    del.setAttribute('aria-label', 'Remove');
-    del.textContent = '✕';
-    del.onclick = () => {
-      saveHistory(loadHistory().filter((x) => !(x.at === e.at && x.u === e.u)));
-      renderHistory();
-    };
-    li.append(open, del);
-    ul.append(li);
-  }
-}
-
-function showHistory() {
-  $('histq').value = '';
-  $('histoff').checked = store.get(HOFF) === '1';
-  renderHistory();
-  $('histdlg').showModal();
-}
-$('histq').addEventListener('input', renderHistory);
-$('histoff').addEventListener('change', (e) => store.set(HOFF, e.target.checked ? '1' : '0'));
-$('histclose').onclick = () => $('histdlg').close();
-$('histclear').onclick = () => {
-  if (!loadHistory().length || !confirm('Clear all history?')) return;
-  saveHistory([]);
-  renderHistory();
-  toast('History cleared');
-};
-
-// Menu
-const pop = $('menu-pop');
-$('menu').addEventListener('click', (e) => { e.stopPropagation(); pop.hidden = !pop.hidden; });
-document.addEventListener('click', () => { pop.hidden = true; });
-window.addEventListener('blur', () => { pop.hidden = true; }); // a tap inside the page blurs this window
-
-function go(raw) {
-  const t = normalize(raw);
-  if (!t) return;
-  setMedia([]);
-  start.hidden = true;
-  input.value = t.site || t.query;
-  bar.className = '';
-  void bar.offsetWidth;
-  bar.className = 'on';
-  frame.src = t.site ? proxyUrl(t.site) : searchUrl(t.query);
-}
-
-function showHome() {
-  setMedia([]);
-  frame.src = 'about:blank';
-  start.hidden = false;
-  input.value = '';
-  document.title = 'Vrows';
-}
-
-const toast = (msg) => {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('on');
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => t.classList.remove('on'), 2800);
-};
-
-// Where the page is (real address) and what the user last tapped. If a script drags the frame
-// out of the proxy (ad hijack, frame-buster), bring the user to what they actually asked for.
-let lastUrl = '';
-let intent = null;
-let recoveries = [];
-frame.addEventListener('load', () => {
-  bar.className = '';
-  if (frame.getAttribute('src') === 'about:blank') return;
-  try { void frame.contentWindow.location.href; return; } catch { /* left our origin */ }
-  const now = Date.now();
-  recoveries = recoveries.filter((t) => now - t < 10000);
-  const target = intent && now - intent.at < 5000 ? intent.url : lastUrl;
-  if (!target || recoveries.length >= 2) { toast('A redirect to another site was blocked'); return; }
-  recoveries.push(now);
-  toast('Blocked a redirect to another site');
-  go(target);
-});
-
-window.addEventListener('message', (e) => {
-  if (e.source !== frame.contentWindow || !e.data || !e.data.vp) return;
-  if (e.data.vp === 2) { intent = { url: e.data.intent, at: Date.now() }; return; }
-  if (e.data.vp === 3) { setMedia(e.data.media); return; }
-  bar.className = '';
-  lastUrl = e.data.url;
-  recordVisit(e.data.url, e.data.title);
-  if (document.activeElement !== input) input.value = e.data.url;
-  if (e.data.title) document.title = e.data.title;
-});
-
-const withFrame = (fn) => () => { try { fn(frame.contentWindow); } catch {} };
-$('back').onclick = withFrame((w) => w.history.back());
-$('fwd').onclick = withFrame((w) => w.history.forward());
-$('reload').onclick = withFrame((w) => w.location.reload());
-$('m-home').onclick = showHome;
-$('m-dl').onclick = showMedia;
-$('m-hist').onclick = showHistory;
-
-input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { go(input.value); input.blur(); } });
-input.addEventListener('focus', () => input.select());
-document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => go(b.dataset.go)));
-
-// The access key is exchanged for an HttpOnly cookie; it is never stored by this page.
+/* ---------- Optional access key ---------- */
 async function checkKey() {
   try {
     const r = await fetch('/api/check');
-    if (r.status === 401) dlg.showModal();
-    else if (r.status === 500) start.querySelector('p').textContent = 'Proxy is not configured yet.';
+    if (r.status === 401) keyDlg.showModal();
   } catch {}
 }
 $('keyform').addEventListener('submit', async (e) => {
@@ -409,12 +666,99 @@ $('keyform').addEventListener('submit', async (e) => {
   $('err').textContent = '';
   try {
     const r = await fetch('/api/login', { method: 'POST', body: $('keyin').value.trim() });
-    if (r.ok) { dlg.close(); $('keyin').value = ''; }
+    if (r.ok) { keyDlg.close(); $('keyin').value = ''; }
     else $('err').textContent = r.status === 401 ? 'Wrong key, try again.' : 'Could not sign in.';
   } catch { $('err').textContent = 'Could not reach the server.'; }
 });
 
+/* ---------- Home: clock and galaxy ---------- */
+function tick() {
+  const d = new Date();
+  $('clock').textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  $('date').textContent = d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+}
+tick();
+setInterval(tick, 20000);
+
+const galaxy = (() => {
+  const cv = $('galaxy'), ctx = cv.getContext('2d');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let w = 0, h = 0, stars = [], shoot = null, nextShoot = 0, raf = 0, running = false;
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = cv.clientWidth; h = cv.clientHeight;
+    if (!w || !h) return;
+    cv.width = w * dpr; cv.height = h * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.round(Math.min(340, (w * h) / 4200));
+    stars = Array.from({ length: n }, () => {
+      const z = Math.random() ** 2 * 0.9 + 0.1;
+      const r = Math.random();
+      return { x: Math.random() * w, y: Math.random() * h, z, tw: Math.random() * 6.28, hue: r < 0.18 ? 195 + Math.random() * 40 : r < 0.3 ? 275 + Math.random() * 50 : 225 };
+    });
+  }
+
+  function draw(t) {
+    ctx.clearRect(0, 0, w, h);
+    for (const s of stars) {
+      if (!reduce) { s.x += s.z * 0.05; if (s.x > w + 2) s.x = -2; }
+      const a = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(s.tw + t * 0.0014 * (0.4 + s.z)));
+      const r = 0.3 + s.z * 1.25;
+      ctx.fillStyle = `hsla(${s.hue},90%,${80 + s.z * 15}%,${a * (0.35 + s.z * 0.65)})`;
+      ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, 6.2832); ctx.fill();
+      if (s.z > 0.82) {
+        const gr = r * 7;
+        const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, gr);
+        g.addColorStop(0, `hsla(${s.hue},100%,85%,${a * 0.35})`); g.addColorStop(1, `hsla(${s.hue},100%,80%,0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(s.x, s.y, gr, 0, 6.2832); ctx.fill();
+      }
+    }
+    if (reduce) return;
+    if (!shoot && t > nextShoot) {
+      shoot = { x: Math.random() * w * 0.8, y: Math.random() * h * 0.4, vx: 5 + Math.random() * 3, vy: 2.2 + Math.random() * 1.6, life: 0 };
+      nextShoot = t + 5000 + Math.random() * 7000;
+    }
+    if (shoot) {
+      shoot.x += shoot.vx; shoot.y += shoot.vy; shoot.life += 1;
+      const f = 1 - shoot.life / 60;
+      const g = ctx.createLinearGradient(shoot.x, shoot.y, shoot.x - shoot.vx * 14, shoot.y - shoot.vy * 14);
+      g.addColorStop(0, `rgba(255,255,255,${0.9 * f})`); g.addColorStop(1, 'rgba(160,170,255,0)');
+      ctx.strokeStyle = g; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(shoot.x, shoot.y); ctx.lineTo(shoot.x - shoot.vx * 14, shoot.y - shoot.vy * 14); ctx.stroke();
+      if (shoot.life >= 60) shoot = null;
+    }
+  }
+
+  function loop(t) {
+    if (!running) return;
+    draw(t);
+    raf = requestAnimationFrame(loop);
+  }
+
+  function run(on) {
+    if (on && !running) {
+      running = true;
+      resize();
+      if (reduce) draw(0); else raf = requestAnimationFrame(loop);
+    } else if (!on) {
+      running = false;
+      cancelAnimationFrame(raf);
+    }
+  }
+  window.addEventListener('resize', () => { if (running) { resize(); if (reduce) draw(0); } });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) cancelAnimationFrame(raf);
+    else if (running && !reduce) raf = requestAnimationFrame(loop);
+  });
+  return { run };
+})();
+
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+galaxy.run(true);
+renderTiles();
+updateBookmarkButton();
 checkKey();
 </script>
 </body>
