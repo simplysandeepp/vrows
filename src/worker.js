@@ -55,14 +55,14 @@ function readKeyCookie(request) {
   return m ? decodeURIComponent(m[1]) : '';
 }
 
+// Access is open unless a PROXY_KEY secret is set
 function denied(request, env) {
-  if (!env.PROXY_KEY) return text('Not configured: PROXY_KEY is missing.', 500);
-  if (readKeyCookie(request) !== env.PROXY_KEY) return text('Unauthorized', 401);
+  if (env.PROXY_KEY && readKeyCookie(request) !== env.PROXY_KEY) return text('Unauthorized', 401);
   return null;
 }
 
 async function login(request, env, url) {
-  if (!env.PROXY_KEY) return text('Not configured: PROXY_KEY is missing.', 500);
+  if (!env.PROXY_KEY) return text('ok', 200);
   const given = request.method === 'POST' ? (await request.text()).trim() : url.searchParams.get('k') || '';
   if (given !== env.PROXY_KEY) return text('Wrong key', 401);
   return new Response('ok', {

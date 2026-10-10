@@ -6,7 +6,7 @@ A small installable web app (PWA) for simple browsing through your own free Clou
 
 - `public/` is the app: an address bar, back/forward/reload, and a service worker for installing it to the home screen.
 - `src/` is the Worker. It fetches pages, rewrites links so everything keeps flowing through it, keeps cookies per site, and serves a lightweight search page.
-- Access is protected by a key that only you know.
+- Optionally protected by an access key (set `PROXY_KEY`); without one, anyone with the address can use it.
 
 ## Setup
 
@@ -14,10 +14,11 @@ A small installable web app (PWA) for simple browsing through your own free Clou
 npm install
 npx wrangler login
 npx wrangler deploy
-npx wrangler secret put PROXY_KEY   # choose any long random value
 ```
 
-Open the deployed URL, enter your key once, then add the app to your home screen.
+Open the deployed URL and add the app to your home screen.
+
+To require a key, run `npx wrangler secret put PROXY_KEY` with any long random value; the app asks for it once.
 
 ## Limits
 
